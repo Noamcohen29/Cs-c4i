@@ -1,8 +1,7 @@
-import { getApprovedUser, getPendingUser, registerUser, getSession, setSession } from './_lib/db.js';
+import { getApprovedUser, getFieldUser, createAnonymousUser, setUserName } from './_lib/db.js';
 import { sendText } from './_lib/whatsapp.js';
 
 export default async function handler(req, res) {
-  // Webhook verification
   if (req.method === 'GET') {
     const { 'hub.mode': mode, 'hub.verify_token': token, 'hub.challenge': challenge } = req.query;
     if (mode === 'subscribe' && token === '123456') return res.status(200).send(challenge);
@@ -12,46 +11,38 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).send('Method Not Allowed');
 
   try {
-    const entries = req.body?.entry ?? [];
-
-    for (const entry of entries) {
+    for (const entry of req.body?.entry ?? []) {
       for (const change of entry.changes ?? []) {
-        const messages = change.value?.messages ?? [];
-
-        for (const message of messages) {
-          // Ignore retries older than 30 seconds
+        for (const message of change.value?.messages ?? []) {
           if (Date.now() - parseInt(message.timestamp) * 1000 > 30000) continue;
 
           const phone = message.from;
           const text = message.text?.body?.trim() ?? '';
 
+          // 1. Approved user → main menu (add features here later)
           const approved = await getApprovedUser(phone);
-
-          // ✅ Approved user — show main menu (placeholder for future features)
           if (approved) {
             await sendText(phone, `שלום ${approved.name}! המערכת עובדת. בקרוב יתווספו כאן אפשרויות נוספות.`);
             continue;
           }
 
-          const pending = await getPendingUser(phone);
+          const user = await getFieldUser(phone);
 
-          // 🕐 Registered but waiting for manager approval
-          if (pending) {
+          // 2. Registered, waiting for approval
+          if (user && user.name) {
             await sendText(phone, 'הינך רשום אך עדיין לא מאושר להשתמש במערכת');
             continue;
           }
 
-          // ❌ Unknown user — registration flow
-          const session = await getSession(phone);
-
-          if (session === 'AWAITING_REG_NAME' && text) {
-            await registerUser(phone, text);
-            await setSession(phone, 'IDLE');
+          // 3. We asked for their name (phone exists, name is null) — save whatever they typed
+          if (user && !user.name && text) {
+            await setUserName(phone, text);
             await sendText(phone, 'הינך רשום אך עדיין לא מאושר להשתמש במערכת');
             continue;
           }
 
-          await setSession(phone, 'AWAITING_REG_NAME');
+          // 4. Completely unknown phone — first contact
+          await createAnonymousUser(phone);
           await sendText(phone, 'אינך רשום במערכת בבקשה הכנס שם מלא');
         }
       }
