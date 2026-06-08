@@ -17,7 +17,6 @@ import {
 import { handleMenuAction } from './_lib/menus.js';
 import {
   sendCategoryList,
-  sendLanguageSelectionButtons,
   sendProductList,
   sendSubmitOrAddButtons,
   sendTaskSelectionList,
@@ -63,50 +62,29 @@ export default async function handler(req, res) {
                 const pendingUser = !userData ? await getPendingFieldUser(senderPhone) : null;
 
                 // --- REGISTRATION GATE ---
-                // If user is not approved (not in Users and not approved in users_isfield),
-                // handle registration flow and stop processing further.
                 if (!userData) {
                   if (pendingUser) {
-                    // Phone is known — still waiting for manager approval
                     await sendWhatsAppText(senderPhone,
-                      `⏳ Hi *${pendingUser.name}*! Your registration is still pending manager approval.\nPlease wait a little longer. 🙏`
+                      `⏳ שלום *${pendingUser.name}*! הרישום שלך עדיין ממתין לאישור מנהל.\nאנא המתן. 🙏`
                     );
                     continue;
                   }
 
-                  // Phone is completely unknown — run registration conversation
+                  // New user — two-step: ask name, then save
                   const sessionState = await getUserSessionState(senderPhone);
+                  const textBody = message.text ? message.text.body.trim() : '';
 
-                  // Step 2: user replied with their name → show language buttons
-                  if (sessionState === 'AWAITING_REG_NAME') {
-                    const textBody = message.text ? message.text.body.trim() : '';
-                    if (textBody) {
-                      await setUserSession(senderPhone, `AWAITING_REG_LANGUAGE|||${textBody}`);
-                      await sendLanguageSelectionButtons(senderPhone, textBody);
-                    }
-                    continue;
-                  }
-
-                  // Step 3: user tapped a language button → save and confirm
-                  if (sessionState.startsWith('AWAITING_REG_LANGUAGE|||') &&
-                      message.type === 'interactive' &&
-                      message.interactive?.type === 'button_reply' &&
-                      message.interactive.button_reply.id.startsWith('reg_lang_')) {
-                    const name = sessionState.split('|||')[1];
-                    const lang = message.interactive.button_reply.id.replace('reg_lang_', '');
-                    await createPendingFieldUser(senderPhone, name, lang);
+                  if (sessionState === 'AWAITING_REG_NAME' && textBody) {
+                    await createPendingFieldUser(senderPhone, textBody);
                     await setUserSession(senderPhone, 'IDLE');
                     await sendWhatsAppText(senderPhone,
-                      `✅ Thank you, *${name}*!\n\nYour registration has been submitted and is pending manager approval.\nYou'll receive full access once approved. 🙏`
+                      `✅ תודה *${textBody}*!\n\nהרישום שלך נשלח ומחכה לאישור מנהל.\nתוכל להשתמש במערכת לאחר האישור. 🙏`
                     );
                     continue;
                   }
 
-                  // Step 1 (or any other state): ask for name to start registration
                   await setUserSession(senderPhone, 'AWAITING_REG_NAME');
-                  await sendWhatsAppText(senderPhone,
-                    `👋 Hi! I'm CS C4I Help Desk.\n\nTo get started, please tell me your *full name*:`
-                  );
+                  await sendWhatsAppText(senderPhone, `👋 שלום! אני מערכת CS C4I.\n\nאנא הקלד את *שמך המלא*:`);
                   continue;
                 }
 

@@ -5,7 +5,6 @@ const sql = neon(connectionString);
 
 export async function getUserByPhone(phone) {
   try {
-    // Check main Users table first
     const result = await sql`
       SELECT name, role, country, language, status, registration_type, employee_id
       FROM Users
@@ -14,11 +13,12 @@ export async function getUserByPhone(phone) {
     `;
     if (result.length > 0) return result[0];
 
-    // Check users_isfield for approved field users
+    // Check users_isfield for approved users
     const fieldResult = await sql`
-      SELECT name, language,
-             COALESCE(role, 'FIELD') as role,
+      SELECT name,
+             COALESCE(role, 'TECH') as role,
              COALESCE(country, '') as country,
+             'he' as language,
              'ACTIVE' as status,
              'field' as registration_type,
              employee_id
@@ -33,7 +33,7 @@ export async function getUserByPhone(phone) {
 export async function getPendingFieldUser(phone) {
   try {
     const result = await sql`
-      SELECT phone, name, language, manager_approved, created_at
+      SELECT phone, name, manager_approved, created_at
       FROM users_isfield
       WHERE phone = ${phone}
       LIMIT 1
@@ -42,14 +42,13 @@ export async function getPendingFieldUser(phone) {
   } catch (error) { return null; }
 }
 
-export async function createPendingFieldUser(phone, name, language) {
+export async function createPendingFieldUser(phone, name) {
   try {
     await sql`
-      INSERT INTO users_isfield (phone, name, language, manager_approved)
-      VALUES (${phone}, ${name}, ${language}, false)
+      INSERT INTO users_isfield (phone, name, role, manager_approved)
+      VALUES (${phone}, ${name}, 'TECH', false)
       ON CONFLICT (phone) DO UPDATE
-      SET name = EXCLUDED.name,
-          language = EXCLUDED.language
+      SET name = EXCLUDED.name
     `;
   } catch (error) {
     console.error('createPendingFieldUser error:', error.message);
