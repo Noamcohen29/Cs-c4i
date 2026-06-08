@@ -71,12 +71,50 @@ export async function getApprovedUsers() {
 
 // ── Tasks ─────────────────────────────────────────────────────────────────────
 
-export async function createTask({ task_date, topic, client_name, client_phone, description, manager_phone, tech_phones, created_by }) {
+export async function createTask({ task_date, end_date, topic, client_name, client_phone, description, manager_phone, tech_phones, created_by }) {
   try {
     const r = await sql`
-      INSERT INTO tasks (task_date, topic, client_name, client_phone, description, manager_phone, tech_phones, created_by)
-      VALUES (${task_date}, ${topic}, ${client_name}, ${client_phone}, ${description}, ${manager_phone}, ${tech_phones}, ${created_by})
+      INSERT INTO tasks (task_date, end_date, topic, client_name, client_phone, description, manager_phone, tech_phones, created_by)
+      VALUES (${task_date}, ${end_date ?? null}, ${topic}, ${client_name}, ${client_phone}, ${description}, ${manager_phone}, ${tech_phones}, ${created_by})
       RETURNING task_id`;
     return r[0]?.task_id ?? null;
   } catch (e) { console.error('createTask:', e.message); return null; }
+}
+
+export async function getActiveTasks() {
+  try {
+    const r = await sql`
+      SELECT task_id, task_date, end_date, topic, client_name, status
+      FROM tasks
+      WHERE status NOT IN ('CANCELLED')
+      ORDER BY task_date DESC
+      LIMIT 20`;
+    return r;
+  } catch { return []; }
+}
+
+export async function getTaskById(taskId) {
+  try {
+    const r = await sql`SELECT * FROM tasks WHERE task_id = ${taskId} LIMIT 1`;
+    return r[0] ?? null;
+  } catch { return null; }
+}
+
+export async function cancelTask(taskId) {
+  try {
+    await sql`UPDATE tasks SET status = 'CANCELLED' WHERE task_id = ${taskId}`;
+  } catch (e) { console.error('cancelTask:', e.message); }
+}
+
+export async function cancelTaskDay(taskId, date) {
+  try {
+    // Append date to cancelled_dates (comma-separated)
+    await sql`
+      UPDATE tasks
+      SET cancelled_dates = CASE
+        WHEN cancelled_dates IS NULL OR cancelled_dates = '' THEN ${date}
+        ELSE cancelled_dates || ',' || ${date}
+      END
+      WHERE task_id = ${taskId}`;
+  } catch (e) { console.error('cancelTaskDay:', e.message); }
 }
