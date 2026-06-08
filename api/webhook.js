@@ -1,5 +1,6 @@
-import { getApprovedUser, getFieldUser, createAnonymousUser, setUserName } from './_lib/db.js';
+import { getApprovedUser, getFieldUser, createAnonymousUser, setUserName, getSession, setSession } from './_lib/db.js';
 import { sendText } from './_lib/whatsapp.js';
+import { sendGMMenu, handleGMAction, handleGMFlow } from './_lib/gm_flow.js';
 
 export default async function handler(req, res) {
   if (req.method === 'GET') {
@@ -17,33 +18,52 @@ export default async function handler(req, res) {
           if (Date.now() - parseInt(message.timestamp) * 1000 > 30000) continue;
 
           const phone = message.from;
-          const text = message.text?.body?.trim() ?? '';
+          const text  = message.text?.body?.trim() ?? '';
 
-          // 1. Approved user → main menu (add features here later)
+          // ── Registration gate ──────────────────────────────────────────
           const approved = await getApprovedUser(phone);
-          if (approved) {
-            await sendText(phone, `שלום ${approved.name}! המערכת עובדת. בקרוב יתווספו כאן אפשרויות נוספות.`);
+
+          if (!approved) {
+            const user = await getFieldUser(phone);
+
+            if (user && user.name) {
+              await sendText(phone, 'הינך רשום אך עדיין לא מאושר להשתמש במערכת');
+              continue;
+            }
+            if (user && !user.name && text) {
+              await setUserName(phone, text);
+              await sendText(phone, 'הינך רשום אך עדיין לא מאושר להשתמש במערכת');
+              continue;
+            }
+            await createAnonymousUser(phone);
+            await sendText(phone, 'אינך רשום במערכת בבקשה הכנס שם מלא');
             continue;
           }
 
-          const user = await getFieldUser(phone);
+          // ── Approved user ──────────────────────────────────────────────
+          const session = await getSession(phone);
+          const btnId  = message.interactive?.button_reply?.id ?? '';
+          const listId = message.interactive?.list_reply?.id ?? '';
+          const action = btnId || listId;
 
-          // 2. Registered, waiting for approval
-          if (user && user.name) {
-            await sendText(phone, 'הינך רשום אך עדיין לא מאושר להשתמש במערכת');
+          // If user is in an active flow — continue it
+          if (session !== 'IDLE') {
+            await handleGMFlow(phone, approved, session, message);
             continue;
           }
 
-          // 3. We asked for their name (phone exists, name is null) — save whatever they typed
-          if (user && !user.name && text) {
-            await setUserName(phone, text);
-            await sendText(phone, 'הינך רשום אך עדיין לא מאושר להשתמש במערכת');
+          // Menu item tapped
+          if (action.startsWith('gm_')) {
+            await handleGMAction(phone, approved, action);
             continue;
           }
 
-          // 4. Completely unknown phone — first contact
-          await createAnonymousUser(phone);
-          await sendText(phone, 'אינך רשום במערכת בבקשה הכנס שם מלא');
+          // Default: show role-based main menu
+          if (approved.role === 'GM') {
+            await sendGMMenu(phone, approved.name);
+          } else {
+            await sendText(phone, `שלום ${approved.name}! תפריט טכנאי יתווסף בקרוב.`);
+          }
         }
       }
     }
