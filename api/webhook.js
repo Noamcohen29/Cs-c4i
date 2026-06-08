@@ -64,27 +64,26 @@ export default async function handler(req, res) {
                 // --- REGISTRATION GATE ---
                 if (!userData) {
                   if (pendingUser) {
-                    await sendWhatsAppText(senderPhone,
-                      `⏳ שלום *${pendingUser.name}*! הרישום שלך עדיין ממתין לאישור מנהל.\nאנא המתן. 🙏`
-                    );
+                    // Registered but waiting for manager approval
+                    await sendWhatsAppText(senderPhone, 'הינך רשום אך עדיין לא מאושר להשתמש במערכת');
                     continue;
                   }
 
-                  // New user — two-step: ask name, then save
+                  // Completely unknown — check if we're waiting for their name
                   const sessionState = await getUserSessionState(senderPhone);
                   const textBody = message.text ? message.text.body.trim() : '';
 
                   if (sessionState === 'AWAITING_REG_NAME' && textBody) {
+                    // Save name → now pending approval
                     await createPendingFieldUser(senderPhone, textBody);
                     await setUserSession(senderPhone, 'IDLE');
-                    await sendWhatsAppText(senderPhone,
-                      `✅ תודה *${textBody}*!\n\nהרישום שלך נשלח ומחכה לאישור מנהל.\nתוכל להשתמש במערכת לאחר האישור. 🙏`
-                    );
+                    await sendWhatsAppText(senderPhone, 'הינך רשום אך עדיין לא מאושר להשתמש במערכת');
                     continue;
                   }
 
+                  // First contact — ask for name
                   await setUserSession(senderPhone, 'AWAITING_REG_NAME');
-                  await sendWhatsAppText(senderPhone, `👋 שלום! אני מערכת CS C4I.\n\nאנא הקלד את *שמך המלא*:`);
+                  await sendWhatsAppText(senderPhone, 'אינך רשום במערכת בבקשה הכנס שם מלא');
                   continue;
                 }
 
