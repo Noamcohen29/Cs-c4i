@@ -61,7 +61,55 @@ export default async function handler(req, res) {
                 const senderPhone = message.from;
                 const userData = await getUserByPhone(senderPhone);
                 const pendingUser = !userData ? await getPendingFieldUser(senderPhone) : null;
-                
+
+                // --- REGISTRATION GATE ---
+                // If user is not approved (not in Users and not approved in users_isfield),
+                // handle registration flow and stop processing further.
+                if (!userData) {
+                  if (pendingUser) {
+                    // Phone is known — still waiting for manager approval
+                    await sendWhatsAppText(senderPhone,
+                      `⏳ Hi *${pendingUser.name}*! Your registration is still pending manager approval.\nPlease wait a little longer. 🙏`
+                    );
+                    continue;
+                  }
+
+                  // Phone is completely unknown — run registration conversation
+                  const sessionState = await getUserSessionState(senderPhone);
+
+                  // Step 2: user replied with their name → show language buttons
+                  if (sessionState === 'AWAITING_REG_NAME') {
+                    const textBody = message.text ? message.text.body.trim() : '';
+                    if (textBody) {
+                      await setUserSession(senderPhone, `AWAITING_REG_LANGUAGE|||${textBody}`);
+                      await sendLanguageSelectionButtons(senderPhone, textBody);
+                    }
+                    continue;
+                  }
+
+                  // Step 3: user tapped a language button → save and confirm
+                  if (sessionState.startsWith('AWAITING_REG_LANGUAGE|||') &&
+                      message.type === 'interactive' &&
+                      message.interactive?.type === 'button_reply' &&
+                      message.interactive.button_reply.id.startsWith('reg_lang_')) {
+                    const name = sessionState.split('|||')[1];
+                    const lang = message.interactive.button_reply.id.replace('reg_lang_', '');
+                    await createPendingFieldUser(senderPhone, name, lang);
+                    await setUserSession(senderPhone, 'IDLE');
+                    await sendWhatsAppText(senderPhone,
+                      `✅ Thank you, *${name}*!\n\nYour registration has been submitted and is pending manager approval.\nYou'll receive full access once approved. 🙏`
+                    );
+                    continue;
+                  }
+
+                  // Step 1 (or any other state): ask for name to start registration
+                  await setUserSession(senderPhone, 'AWAITING_REG_NAME');
+                  await sendWhatsAppText(senderPhone,
+                    `👋 Hi! I'm CS C4I Help Desk.\n\nTo get started, please tell me your *full name*:`
+                  );
+                  continue;
+                }
+
                 // --- 1. INTERACTIVE MESSAGE HANDLING ---
                 if (message.type === 'interactive') {
                   const interactiveType = message.interactive.type;
@@ -70,21 +118,7 @@ export default async function handler(req, res) {
                   if (interactiveType === 'button_reply') {
                     const buttonId = message.interactive.button_reply.id;
                     const sessionState = await getUserSessionState(senderPhone);
-
-                    // Handle language selection during registration
-                    if (buttonId.startsWith('reg_lang_')) {
-                      if (sessionState.startsWith('AWAITING_REG_LANGUAGE|||')) {
-                        const name = sessionState.split('|||')[1];
-                        const lang = buttonId.replace('reg_lang_', '');
-                        await createPendingFieldUser(senderPhone, name, lang);
-                        await setUserSession(senderPhone, 'IDLE');
-                        await sendWhatsAppText(senderPhone,
-                          `✅ Thank you, *${name}*!\n\nYour registration has been submitted and is pending manager approval.\nYou'll receive full access once approved. 🙏`
-                        );
-                      }
-                    } else {
-                      await handleMenuAction(buttonId, senderPhone, userData, sessionState);
-                    }
+                    await handleMenuAction(buttonId, senderPhone, userData, sessionState);
                   }
                   
                   // B. User selected an item from a LIST MENU
@@ -203,28 +237,7 @@ export default async function handler(req, res) {
                 }
 
                 if (textBody) {
-                  if (!userData) {
-                    if (pendingUser && !pendingUser.manager_approved) {
-                      // Already registered, waiting for approval
-                      await sendWhatsAppText(senderPhone,
-                        `⏳ Hi *${pendingUser.name}*! Your registration is still pending manager approval.\nPlease wait a little longer. 🙏`
-                      );
-                    } else if (!pendingUser) {
-                      // New user — start registration conversation
-                      const sessionState = await getUserSessionState(senderPhone);
-                      if (sessionState === 'AWAITING_REG_NAME') {
-                        const name = textBody.trim();
-                        await setUserSession(senderPhone, `AWAITING_REG_LANGUAGE|||${name}`);
-                        await sendLanguageSelectionButtons(senderPhone, name);
-                      } else {
-                        await setUserSession(senderPhone, 'AWAITING_REG_NAME');
-                        await sendWhatsAppText(senderPhone,
-                          `👋 Hi! I'm CS C4I Help Desk.\n\nTo get started, please tell me your *full name*:`
-                        );
-                      }
-                    }
-                  } else {
-                    const sessionState = await getUserSessionState(senderPhone);
+                  const sessionState = await getUserSessionState(senderPhone);
 
                     // A. Text is a Serial Number
                     if (sessionState.startsWith('AWAITING_SERIAL_NUMBER|||')) {
@@ -408,7 +421,6 @@ export default async function handler(req, res) {
                       const menuBody = `👋 Hello *${userData.name}*! I'm CS C4I Help Desk.\n\n${ticketNote}${taskNote}\n\nPlease select an action:`;
                       await sendTicketMenu(senderPhone, userData, menuBody);
                     }
-                  }
                 }
               }
             }
