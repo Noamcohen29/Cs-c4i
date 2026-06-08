@@ -2,7 +2,9 @@ import {
   addTicketComment,
   createInvoiceSubmission,
   createMissionStatusUpdate,
+  createPendingFieldUser,
   createTaskReport,
+  getPendingFieldUser,
   getUserByPhone,
   getUserSessionState,
   getUserTickets,
@@ -15,6 +17,7 @@ import {
 import { handleMenuAction } from './_lib/menus.js';
 import {
   sendCategoryList,
+  sendLanguageSelectionButtons,
   sendProductList,
   sendSubmitOrAddButtons,
   sendTaskSelectionList,
@@ -57,6 +60,7 @@ export default async function handler(req, res) {
 
                 const senderPhone = message.from;
                 const userData = await getUserByPhone(senderPhone);
+                const pendingUser = !userData ? await getPendingFieldUser(senderPhone) : null;
                 
                 // --- 1. INTERACTIVE MESSAGE HANDLING ---
                 if (message.type === 'interactive') {
@@ -66,7 +70,21 @@ export default async function handler(req, res) {
                   if (interactiveType === 'button_reply') {
                     const buttonId = message.interactive.button_reply.id;
                     const sessionState = await getUserSessionState(senderPhone);
-                    await handleMenuAction(buttonId, senderPhone, userData, sessionState);
+
+                    // Handle language selection during registration
+                    if (buttonId.startsWith('reg_lang_')) {
+                      if (sessionState.startsWith('AWAITING_REG_LANGUAGE|||')) {
+                        const name = sessionState.split('|||')[1];
+                        const lang = buttonId.replace('reg_lang_', '');
+                        await createPendingFieldUser(senderPhone, name, lang);
+                        await setUserSession(senderPhone, 'IDLE');
+                        await sendWhatsAppText(senderPhone,
+                          `✅ Thank you, *${name}*!\n\nYour registration has been submitted and is pending manager approval.\nYou'll receive full access once approved. 🙏`
+                        );
+                      }
+                    } else {
+                      await handleMenuAction(buttonId, senderPhone, userData, sessionState);
+                    }
                   }
                   
                   // B. User selected an item from a LIST MENU
@@ -186,9 +204,25 @@ export default async function handler(req, res) {
 
                 if (textBody) {
                   if (!userData) {
-                    const encodedPhoneToken = Buffer.from(senderPhone).toString('base64');
-                    const registrationUrl = `https://c4i-whatsapp-proxy.vercel.app/register.html?token=${encodedPhoneToken}`;
-                    await sendWhatsAppText(senderPhone, `Hi! I am CS C4I HD. Please register at this URL:\n${registrationUrl}`);
+                    if (pendingUser && !pendingUser.manager_approved) {
+                      // Already registered, waiting for approval
+                      await sendWhatsAppText(senderPhone,
+                        `⏳ Hi *${pendingUser.name}*! Your registration is still pending manager approval.\nPlease wait a little longer. 🙏`
+                      );
+                    } else if (!pendingUser) {
+                      // New user — start registration conversation
+                      const sessionState = await getUserSessionState(senderPhone);
+                      if (sessionState === 'AWAITING_REG_NAME') {
+                        const name = textBody.trim();
+                        await setUserSession(senderPhone, `AWAITING_REG_LANGUAGE|||${name}`);
+                        await sendLanguageSelectionButtons(senderPhone, name);
+                      } else {
+                        await setUserSession(senderPhone, 'AWAITING_REG_NAME');
+                        await sendWhatsAppText(senderPhone,
+                          `👋 Hi! I'm CS C4I Help Desk.\n\nTo get started, please tell me your *full name*:`
+                        );
+                      }
+                    }
                   } else {
                     const sessionState = await getUserSessionState(senderPhone);
 

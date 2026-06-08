@@ -234,3 +234,26 @@ export async function sendTicketActionButtons(toPhone, ticketId, ticketStatus) {
     })
   });
 }
+
+export async function sendLanguageSelectionButtons(toPhone, name) {
+  const token = process.env.WHATSAPP_TOKEN;
+  const phoneNumberId = '1039050632632559';
+  await fetch(`https://graph.facebook.com/v25.0/${phoneNumberId}/messages`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      messaging_product: 'whatsapp', to: toPhone, type: 'interactive',
+      interactive: {
+        type: 'button',
+        body: { text: `Nice to meet you, *${name}*! 👋\n\nPlease select your preferred language:` },
+        action: {
+          buttons: [
+            { type: 'reply', reply: { id: 'reg_lang_en', title: '🇬🇧 English' } },
+            { type: 'reply', reply: { id: 'reg_lang_he', title: '🇮🇱 עברית' } },
+            { type: 'reply', reply: { id: 'reg_lang_ar', title: '🇸🇦 عربي' } }
+          ]
+        }
+      }
+    })
+  });
+}
