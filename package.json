@@ -1,0 +1,18 @@
+{
+  "dependencies": {
+    "@neondatabase/serverless": "^1.1.0",
+    "@vercel/blob": "^2.3.3",
+    "@vercel/postgres": "^0.10.0",
+    "resend": "^6.12.2"
+  },
+  "name": "c4i-whatsapp-proxy",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}

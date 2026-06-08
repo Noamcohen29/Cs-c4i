@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CS C4I - Success</title>
+    <style>
+        :root {
+            --primary-blue: #004b87;
+            --light-blue: #e6f0fa;
+            --success-green: #10b981;
+            --text-dark: #333333;
+            --text-light: #666666;
+            --bg-color: #f8fafc;
+            --card-bg: #ffffff;
+            --border-color: #e2e8f0;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-dark);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            background-color: var(--card-bg);
+            width: 100%;
+            max-width: 450px;
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.05);
+            overflow: hidden;
+            text-align: center;
+            padding: 40px 30px;
+            box-sizing: border-box;
+        }
+
+        /* Success Animation Circle */
+        .success-icon {
+            width: 80px;
+            height: 80px;
+            background-color: #d1fae5;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 0 auto 25px;
+        }
+
+        .success-icon svg {
+            width: 40px;
+            height: 40px;
+            color: var(--success-green);
+        }
+
+        h1 {
+            margin: 0 0 10px;
+            font-size: 24px;
+            color: var(--primary-blue);
+            font-weight: 600;
+        }
+
+        p {
+            margin: 0 0 30px;
+            font-size: 15px;
+            color: var(--text-light);
+            line-height: 1.5;
+        }
+
+        .user-details {
+            background-color: var(--bg-color);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 30px;
+            text-align: left;
+            font-size: 14px;
+        }
+
+        .user-details strong {
+            color: var(--primary-blue);
+        }
+
+        .return-btn {
+            display: block;
+            width: 100%;
+            background-color: var(--success-green);
+            color: white;
+            border: none;
+            padding: 14px;
+            font-size: 16px;
+            font-weight: 600;
+            border-radius: 6px;
+            cursor: pointer;
+            text-decoration: none;
+            transition: background-color 0.3s, transform 0.1s;
+        }
+
+        .return-btn:hover {
+            background-color: #059669;
+        }
+
+        .return-btn:active {
+            transform: scale(0.98);
+        }
+
+        .footer {
+            margin-top: 25px;
+            font-size: 12px;
+            color: var(--text-light);
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="success-icon">
+        <!-- SVG Checkmark -->
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+        </svg>
+    </div>
+
+    <h1>Registration Complete!</h1>
+    <p>Your details have been successfully saved in the CS C4I system. You are now authorized to open support tickets.</p>
+
+    <!-- Optional: We can inject the user's name here via URL parameters if we want -->
+    <div class="user-details" id="welcomeMessage" style="display: none;">
+        Welcome aboard, <strong id="displayName"></strong>.<br>
+        Your WhatsApp number has been securely linked.
+    </div>
+
+    <!-- Replace '1234567890' with your actual WhatsApp Business Number -->
+    <a href="https://wa.me/1039050632632559" class="return-btn">Return to WhatsApp</a>
+
+    <div class="footer">
+        Secured by CS C4I System Portal &copy; 2026
+    </div>
+</div>
+
+<script>
+    // Optional JS to show the user's name if passed in the URL (e.g., success.html?name=John)
+    document.addEventListener('DOMContentLoaded', () => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const userName = urlParams.get('name');
+        
+        if (userName) {
+            document.getElementById('displayName').textContent = userName;
+            document.getElementById('welcomeMessage').style.display = 'block';
+        }
+    });
+</script>
+
+</body>
+</html>
